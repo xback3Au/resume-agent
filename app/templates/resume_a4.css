@@ -1,0 +1,180 @@
+/* ── A4 简历排版模板 ─────────────────────────────────────── */
+/* 目标：模拟 A4 纸张（210×297mm），适配屏幕预览和 PDF 导出 */
+
+@page {
+  size: A4;
+  margin: 14mm 16mm 12mm 16mm;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: #222;
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── A4 容器（预览用） ── */
+.resume-page {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 14mm 16mm 12mm 16mm;
+  background: #fff;
+  position: relative;
+}
+
+/* 屏幕预览：A4 分页指示线（297mm 减去底部页边距 12mm = 285mm） */
+.resume-page::after {
+  content: '——  A4 一页分界线  ——';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(297mm - 12mm);
+  border-top: 2px dashed #ff4d4f;
+  color: #ff4d4f;
+  font-size: 9px;
+  text-align: center;
+  padding-top: 3px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* 打印时去掉阴影、外边距和分页指示线 */
+@media print {
+  .resume-page {
+    width: auto;
+    min-height: auto;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .resume-page::after { display: none; }
+}
+
+/* ── 照片（个人信息区域右侧，与第一行内容顶部对齐） ── */
+.resume-photo {
+  float: right;
+  width: 28mm;
+  height: 38mm;
+  object-fit: cover;
+  border: 0.5pt solid #ccc;
+  margin: 0 0 6pt 10pt;
+}
+
+/* ── 姓名区域 ── */
+h1 {
+  font-size: 20pt;
+  font-weight: 700;
+  color: #1a3c6e;
+  margin-bottom: 4pt;
+  letter-spacing: 1pt;
+}
+
+/* 个人信息行（联系方式） */
+.info-line {
+  font-size: 9pt;
+  color: #555;
+  margin-bottom: 6pt;
+  line-height: 1.6;
+}
+.info-line span + span::before {
+  content: " | ";
+  color: #bbb;
+  margin: 0 4pt;
+}
+
+/* ── 模块标题（## 标题） ── */
+h2 {
+  font-size: 12pt;
+  font-weight: 700;
+  color: #1a3c6e;
+  margin-top: 10pt;
+  margin-bottom: 3pt;
+  padding-bottom: 2.5pt;
+  border-bottom: 1.8pt solid #1a3c6e;
+  page-break-after: avoid;
+}
+/* 第一个 h2 可能是姓名，不清除浮动；后续 h2 清除照片浮动 */
+h2 ~ h2 {
+  clear: both;
+}
+
+/* ── 经历条目标题（### 或加粗行：公司 · 职位 · 时间） ── */
+h3 {
+  font-size: 10.5pt;
+  font-weight: 700;
+  color: #333;
+  margin-top: 6pt;
+  margin-bottom: 1pt;
+  page-break-after: avoid;
+}
+h3 em {
+  font-weight: 400;
+  font-style: normal;
+  float: right;
+  color: #666;
+  font-size: 9.5pt;
+}
+
+/* ── 段落正文 ── */
+p {
+  margin-bottom: 2pt;
+  text-align: justify;
+}
+
+/* ── 无序列表（技能 / 经历要点） ── */
+ul {
+  padding-left: 14pt;
+  margin-bottom: 2pt;
+}
+li {
+  margin-bottom: 1.5pt;
+}
+li::marker {
+  color: #1a3c6e;
+  font-size: 8pt;
+}
+
+/* ── 行内样式 ── */
+strong { font-weight: 600; }
+em { font-style: italic; color: #555; }
+code {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 9pt;
+  background: #f4f4f8;
+  padding: 0.5pt 3pt;
+  border-radius: 2pt;
+}
+
+/* ── 分割线 ── */
+hr {
+  border: none;
+  border-top: 0.5pt solid #ccc;
+  margin: 6pt 0;
+}
+
+/* ── 紧凑模式（内容多时缩小间距） ── */
+.resume-page.compact {
+  font-size: 9.5pt;
+  line-height: 1.4;
+}
+.compact h1 { font-size: 18pt; }
+.compact h2 { font-size: 11pt; margin-top: 7pt; }
+.compact h3 { font-size: 9.5pt; margin-top: 4pt; }
+.compact ul { padding-left: 12pt; }
+.compact li { margin-bottom: 0.5pt; }
+.compact p { margin-bottom: 1pt; }
+
+/* ── 宽松模式（内容少时撑满页面） ── */
+.resume-page.spacious {
+  font-size: 11pt;
+  line-height: 1.7;
+}
+.spacious h2 { margin-top: 14pt; margin-bottom: 5pt; }
+.spacious h3 { margin-top: 8pt; }
+.spacious p { margin-bottom: 3pt; }
+.spacious li { margin-bottom: 2.5pt; }

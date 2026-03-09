@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>简历定制智能体</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx-preview/dist/docx-preview.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      margin: 0; padding: 0; background: #f0f2f5; color: #333;
+    }
+    .container { max-width: 1440px; margin: 0 auto; padding: 16px 20px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .subtitle { color: #888; font-size: 13px; margin-bottom: 14px; }
+    .card {
+      background: #fff; border-radius: 8px; padding: 16px 20px;
+      margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card > label:first-child { font-weight: 600; font-size: 13px; color: #555; display: block; margin-bottom: 6px; }
+    textarea {
+      width: 100%; border: 1px solid #d9d9d9; border-radius: 4px;
+      padding: 10px; font-size: 13px; resize: vertical; font-family: inherit; line-height: 1.6;
+    }
+    input[type="text"] {
+      width: 100%; border: 1px solid #d9d9d9; border-radius: 4px;
+      padding: 8px 10px; font-size: 13px;
+    }
+    select { border: 1px solid #d9d9d9; border-radius: 4px; padding: 6px 8px; font-size: 13px; }
+    input[type="file"] { font-size: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 7px 14px; border: none; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: opacity .15s; white-space: nowrap;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: #1677ff; color: #fff; }
+    .btn-green  { background: #52c41a; color: #fff; }
+    .btn-default { background: #f5f5f5; border: 1px solid #d9d9d9; color: #333; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .toolbar label { margin: 0; font-weight: 500; font-size: 13px; color: #555; }
+    .panels { display: flex; height: 620px; position: relative; }
+    .panel { min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .panel-left { flex: 1 1 50%; }
+    .panel-right { flex: 1 1 50%; }
+    .panel-header { font-weight: 600; font-size: 13px; color: #555; margin-bottom: 6px; }
+    /* 可拖拽分隔条 */
+    .splitter {
+      width: 6px; cursor: col-resize; background: #e0e0e0; border-radius: 3px;
+      flex-shrink: 0; transition: background .15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .splitter:hover, .splitter.active { background: #1677ff; }
+    .splitter::after { content: '⋮'; color: #999; font-size: 14px; pointer-events: none; }
+    .splitter:hover::after, .splitter.active::after { color: #fff; }
+    #resumeText { min-height: 0; flex: 1; resize: none; }
+    #docxPreview {
+      border: 1px solid #d9d9d9; border-radius: 4px; background: #e8e8e8;
+      flex: 1; overflow: auto; padding: 0;
+      position: relative; display: block;
+    }
+    #docxPreview .placeholder { text-align: center; padding: 80px 20px; color: #bbb; font-size: 14px; }
+    /* 让 docx-preview 渲染容器自动缩放适配面板宽度 */
+    #docxPreview .docx-wrapper { padding: 10px !important; background: #e8e8e8 !important; }
+    #docxPreview .docx-wrapper > section.docx {
+      margin: 0 auto !important;
+      transform-origin: top center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    /* HTML 预览 iframe */
+    #htmlPreview {
+      border: 1px solid #d9d9d9; border-radius: 4px; background: #e8e8e8;
+      flex: 1; overflow: auto; padding: 10px;
+      position: relative; display: none;
+    }
+    #htmlPreview iframe {
+      width: 210mm;
+      transform-origin: top left;
+      border: none; background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      display: block;
+    }
+    .status { font-size: 12px; color: #888; margin-top: 6px; min-height: 18px; }
+    .inline-group { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    .history-box {
+      margin-top: 8px; border: 1px solid #e8e8e8; border-radius: 6px;
+      background: #fafafa; padding: 8px 10px; font-size: 12px; color: #666;
+      max-height: 130px; overflow: auto; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overflow-bar button:hover { opacity: .85; }
+    @media (max-width: 900px) {
+      .panels { flex-direction: column; height: auto; }
+      .splitter { width: 100%; height: 6px; cursor: row-resize; }
+      .panel-left, .panel-right { width: 100% !important; flex: none !important; min-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📄 简历定制智能体</h1>
+  <p class="subtitle">粘贴岗位JD → 生成定制简历 → 编辑文本 → 预览排版 → 下载</p>
+
+  <!-- 输入 -->
+  <div class="card">
+    <label>岗位描述（JD）</label>
+    <div style="position:relative">
+      <textarea id="jdText" rows="5" placeholder="请粘贴岗位描述文字，或直接粘贴/拖入 JD 截图…"></textarea>
+      <!-- 图片预览区 -->
+      <div id="jdImageBox" style="display:none; margin-top:6px; padding:8px; border:1px dashed #d9d9d9; border-radius:4px; background:#fafafa; position:relative;">
+        <img id="jdImagePreview" style="max-width:100%; max-height:200px; border-radius:4px;" />
+        <button id="jdImageClear" class="btn btn-default" style="position:absolute; top:4px; right:4px; padding:2px 8px; font-size:12px;">✕ 移除图片</button>
+        <div id="ocrStatus" style="font-size:12px; color:#888; margin-top:4px;"></div>
+      </div>
+    </div>
+    <label style="margin-top:8px">补充要求（可选）</label>
+    <textarea id="userNotes" rows="2" placeholder="例如：请突出 Python 经验、加上某段经历、注意排版紧凑…"></textarea>
+    <div class="inline-group">
+      <button class="btn btn-primary" id="generateBtn">🚀 生成首版简历</button>
+      <button class="btn btn-default" id="rewriteBtn" disabled>✏️ 按补充要求修改</button>
+      <button class="btn btn-default" id="rollbackBtn" disabled>↩ 回到上一版本</button>
+      <span class="status" id="genStatus"></span>
+      <span id="genSpinner" style="display:none;margin-left:4px">
+        <svg width="18" height="18" viewBox="0 0 24 24" style="animation:spin 1s linear infinite;vertical-align:middle">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="#1677ff" stroke-width="3" stroke-dasharray="50 20" stroke-linecap="round"/>
+        </svg>
+      </span>
+    </div>
+    <div id="promptHistory" class="history-box"></div>
+  </div>
+
+  <!-- 思考过程（折叠） -->
+  <div class="card" id="thinkingCard" style="display:none;">
+    <details id="thinkingDetails">
+      <summary style="cursor:pointer; font-weight:600; font-size:13px; color:#555; user-select:none;">
+        🧠 DeepSeek R1 思考过程 <span id="thinkingHint" style="font-weight:normal; color:#999; font-size:12px;">（点击展开/收起）</span>
+      </summary>
+      <pre id="thinkingText" style="margin-top:8px; max-height:300px; overflow:auto; background:#f8f8f8; border:1px solid #e8e8e8; border-radius:4px; padding:10px; font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word; color:#666;"></pre>
+    </details>
+  </div>
+
+  <!-- 工具栏 + 编辑器 + 预览 -->
+  <div class="card">
+    <div class="toolbar">
+      <label>排版</label>
+      <select id="layoutMode">
+        <option value="standard">标准</option>
+        <option value="compact">紧凑（一页）</option>
+      </select>
+      <label style="margin-left:8px">照片</label>
+      <input type="file" id="photoInput" accept="image/*">
+      <span style="flex:1"></span>
+      <label>预览模式</label>
+      <select id="previewMode">
+        <option value="html">HTML排版（推荐）</option>
+        <option value="docx">DOCX排版</option>
+      </select>
+      <button class="btn btn-green" id="previewBtn">👁 预览</button>
+      <button class="btn btn-primary" id="downloadPdfBtn">⬇ 下载PDF</button>
+      <button class="btn btn-default" id="downloadDocxBtn">⬇ 下载DOCX</button>
+      <button class="btn btn-default" id="downloadTxtBtn">⬇ 下载TXT</button>
+      <span style="margin-left:4px;font-size:13px;color:#555">缩减</span>
+      <select id="compressLines" style="width:60px;border:1px solid #d9d9d9;border-radius:4px;padding:4px 6px;font-size:13px">
+        <option value="1">1行</option>
+        <option value="2">2行</option>
+        <option value="3" selected>3行</option>
+        <option value="5">5行</option>
+        <option value="8">8行</option>
+      </select>
+      <button class="btn btn-default" id="compressBtn" title="让 AI 缩减指定行数的内容">🔧 自动缩减</button>
+      <span id="compressSpinner" style="display:none;margin-left:2px">
+        <svg width="16" height="16" viewBox="0 0 24 24" style="animation:spin 1s linear infinite;vertical-align:middle">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="#555" stroke-width="3" stroke-dasharray="50 20" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <button class="btn btn-default" id="undoCompressBtn" style="display:none" title="撤回上一次缩减">↩ 撤回缩减</button>
+    </div>
+    <div class="panels" id="panelsContainer">
+      <div class="panel panel-left" id="panelLeft">
+        <div class="panel-header">简历文本（可编辑后再预览/下载）</div>
+        <textarea id="resumeText" placeholder="生成后的简历文本将显示在这里，你可以自由编辑后再预览或下载…"></textarea>
+      </div>
+      <div class="splitter" id="splitter"></div>
+      <div class="panel panel-right" id="panelRight">
+        <div class="panel-header">简历预览</div>
+        <div id="docxPreview">
+          <div class="placeholder">点击「预览」查看排版效果</div>
+        </div>
+        <div id="htmlPreview"></div>
+      </div>
+    </div>
+    <div class="status" id="exportStatus"></div>
+  </div>
+
+<script>
+/* ── 状态 ──────────────────────────────────── */
+let sessionId = "";
+let versionId = "";
+let photoFilename = "";
+let promptTurn = 0;
+const versionStack = [];
+const $ = s => document.getElementById(s);
+
+function appendPromptHistory(label, text) {
+  const box = $("promptHistory");
+  promptTurn += 1;
+  const escaped = (text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  box.style.display = "block";
+  box.innerHTML += `<div style=\"margin-bottom:6px;\"><b>第${promptTurn}轮 ${label}</b>：${escaped}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+
+function syncVersionButtons() {
+  $("rewriteBtn").disabled = !(sessionId && versionId);
+  $("rollbackBtn").disabled = versionStack.length <= 1;
+}
+
+/* ── 可拖拽分隔条 ──────────────────────────── */
+(function initSplitter() {
+  const container = $("panelsContainer");
+  const splitter = $("splitter");
+  const left = $("panelLeft");
+  const right = $("panelRight");
+  let dragging = false;
+
+  splitter.addEventListener("mousedown", e => {
+    e.preventDefault();
+    dragging = true;
+    splitter.classList.add("active");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  });
+
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const rect = container.getBoundingClientRect();
+    const splitterW = splitter.offsetWidth;
+    const offset = e.clientX - rect.left;
+    const minW = 200;
+    const maxW = rect.width - splitterW - minW;
+    const clamped = Math.min(Math.max(offset, minW), maxW);
+    const pct = (clamped / rect.width) * 100;
+    left.style.flex = "none";
+    left.style.width = pct + "%";
+    right.style.flex = "none";
+    right.style.width = (100 - pct - (splitterW / rect.width) * 100) + "%";
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove("active");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    rescalePreview();
+  });
+})();
+
+/* ── 预览缩放适配 ──────────────────────────── */
+function rescalePreview() {
+  /* DOCX 模式 */
+  const page = $("docxPreview").querySelector("section.docx");
+  if (page) {
+    page.style.transform = "";
+    const pw = page.scrollWidth;
+    const cw = $("docxPreview").clientWidth - 30;
+    if (pw > cw) page.style.transform = `scale(${(cw / pw).toFixed(3)})`;
+  }
+  /* HTML 模式 */
+  const iframe = $("htmlPreview").querySelector("iframe");
+  if (iframe && iframe.contentDocument) {
+    const docEl = iframe.contentDocument.documentElement;
+    const contentH = Math.max(docEl.scrollHeight, docEl.offsetHeight) + 30;
+    iframe.style.height = contentH + "px";
+    const containerW = $("htmlPreview").clientWidth - 20;
+    const iframeW = iframe.offsetWidth;
+    const scale = Math.min(containerW / iframeW, 1);
+    iframe.style.transform = `scale(${scale.toFixed(3)})`;
+    iframe.style.marginRight = -(iframeW * (1 - scale)) + "px";
+    iframe.style.marginBottom = -(contentH * (1 - scale)) + "px";
+  }
+}
+
+function setStatus(el, msg, isErr) {
+  el.textContent = msg;
+  el.style.color = isErr ? "#ff4d4f" : "#52c41a";
+}
+
+/* ── 通用请求（含重试） ────────────────────── */
+async function postJson(url, data, retries = 1) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) {
+        const p = await r.json().catch(() => ({}));
+        throw new Error(p.detail || `服务器错误 (${r.status})`);
+      }
+      return await r.json();
+    } catch (err) {
+      lastErr = err;
+      if (i < retries && err instanceof TypeError) {
+        /* 网络错误(如服务重启)，等1秒后重试 */
+        await new Promise(ok => setTimeout(ok, 1000));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/* ── 照片上传 ──────────────────────────────── */
+$("photoInput").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const r = await fetch("/api/upload-photo", { method: "POST", body: fd });
+    const p = await r.json();
+    if (!r.ok) throw new Error(p.detail);
+    photoFilename = p.filename;
+    setStatus($("exportStatus"), "照片已上传: " + p.filename);
+  } catch (err) {
+    setStatus($("exportStatus"), "照片上传失败: " + err.message, true);
+  }
+});
+
+
+/* ── JD 图片粘贴 / 拖拽 OCR ─────────────────── */
+function handleJdImage(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const dataUrl = ev.target.result;
+    $("jdImagePreview").src = dataUrl;
+    $("jdImageBox").style.display = "block";
+    $("ocrStatus").textContent = "正在识别图片中的文字…";
+    $("ocrStatus").style.color = "#1677ff";
+    try {
+      const b64 = dataUrl.split(",")[1];
+      const resp = await postJson("/api/ocr-jd", {
+        image_b64: b64,
+        mime_type: file.type,
+      });
+      if (resp.text) {
+        $("jdText").value = resp.text;
+        $("ocrStatus").textContent = "文字提取完成 ✓（已自动填入JD输入框）";
+        $("ocrStatus").style.color = "#52c41a";
+      } else {
+        $("ocrStatus").textContent = "未识别到文字";
+        $("ocrStatus").style.color = "#ff4d4f";
+      }
+    } catch (err) {
+      $("ocrStatus").textContent = "识别失败: " + err.message;
+      $("ocrStatus").style.color = "#ff4d4f";
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+/* 监听粘贴事件 */
+$("jdText").addEventListener("paste", (e) => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      handleJdImage(item.getAsFile());
+      return;
+    }
+  }
+});
+
+/* 监听拖拽事件 */
+$("jdText").addEventListener("dragover", (e) => { e.preventDefault(); });
+$("jdText").addEventListener("drop", (e) => {
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (files && files.length > 0 && files[0].type.startsWith("image/")) {
+    e.preventDefault();
+    handleJdImage(files[0]);
+  }
+});
+
+/* 移除图片 */
+$("jdImageClear").onclick = () => {
+  $("jdImageBox").style.display = "none";
+  $("jdImagePreview").src = "";
+  $("ocrStatus").textContent = "";
+};
+
+
+/* ── 生成首版（流式） ───────────────────── */
+$("generateBtn").onclick = async () => {
+  const jd = $("jdText").value.trim();
+  if (!jd) return alert("请先输入JD文本");
+  const notes = $("userNotes").value.trim();
+  setStatus($("genStatus"), "正在生成，请稍候…");
+  $("generateBtn").disabled = true;
+  $("rewriteBtn").disabled = true;
+  $("rollbackBtn").disabled = true;
+  $("genSpinner").style.display = "inline";
+  $("resumeText").value = "";
+  $("promptHistory").innerHTML = "";
+  $("promptHistory").style.display = "none";
+  promptTurn = 0;
+  /* 重置思考过程 */
+  $("thinkingCard").style.display = "none";
+  $("thinkingText").textContent = "";
+  $("thinkingDetails").open = false;
+  let hasThinking = false;
+  try {
+    const resp = await fetch("/api/generate-stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jd_text: jd, user_notes: notes || "" }),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.detail || `服务器错误 (${resp.status})`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let nextEventType = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      /* 解析 SSE 行 */
+      const lines = buf.split("\n");
+      buf = lines.pop(); /* 未结束的行留用 */
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          nextEventType = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const payload = line.slice(6);
+          if (nextEventType === "done" || payload.includes("session_id")) {
+            try {
+              const meta = JSON.parse(payload);
+              sessionId = meta.session_id || sessionId;
+              versionId = meta.version_id || versionId;
+            } catch {}
+          } else if (nextEventType === "thinking") {
+            /* DeepSeek R1 思考过程 */
+            if (!hasThinking) {
+              hasThinking = true;
+              $("thinkingCard").style.display = "block";
+              $("thinkingDetails").open = true;
+              setStatus($("genStatus"), "R1 正在深度思考中…");
+            }
+            $("thinkingText").textContent += payload.replace(/\\n/g, "\n");
+            $("thinkingText").scrollTop = $("thinkingText").scrollHeight;
+          } else {
+            if (hasThinking && $("resumeText").value === "") {
+              $("thinkingDetails").open = false;
+              setStatus($("genStatus"), "思考完成，正在输出简历…");
+            }
+            $("resumeText").value += payload.replace(/\\n/g, "\n");
+            $("resumeText").scrollTop = $("resumeText").scrollHeight;
+          }
+          nextEventType = "";
+        }
+      }
+    }
+    /* 处理最后的 buf 残留 */
+    if (buf.includes("session_id")) {
+      try {
+        const idx = buf.indexOf("{");
+        if (idx >= 0) {
+          const meta = JSON.parse(buf.slice(idx));
+          sessionId = meta.session_id || sessionId;
+          versionId = meta.version_id || versionId;
+        }
+      } catch {}
+    }
+    const effLines = $("resumeText").value.trim().split("\n").filter(l => l.trim()).length;
+    appendPromptHistory("首版生成", notes || "（未填写补充要求）");
+    versionStack.length = 0;
+    if (versionId) versionStack.push(versionId);
+    syncVersionButtons();
+    setStatus($("genStatus"), `生成完成 ✓（有效行数：${effLines}，阈值：45）`);
+  } catch (err) {
+    setStatus($("genStatus"), err.message, true);
+  } finally {
+    $("generateBtn").disabled = false;
+    $("genSpinner").style.display = "none";
+  }
+};
+
+/* ── 多轮改写（按补充要求） ────────────────── */
+$("rewriteBtn").onclick = async () => {
+  if (!sessionId || !versionId) {
+    alert("请先生成首版简历，再进行多轮修改");
+    return;
+  }
+  const instruction = $("userNotes").value.trim();
+  if (!instruction) {
+    alert("请先填写补充要求，再点击修改");
+    return;
+  }
+
+  $("rewriteBtn").disabled = true;
+  $("generateBtn").disabled = true;
+  $("genSpinner").style.display = "inline";
+  setStatus($("genStatus"), "正在根据补充要求改写…");
+
+  try {
+    const data = await postJson("/api/rewrite", {
+      session_id: sessionId,
+      version_id: versionId,
+      instruction,
+    });
+    sessionId = data.session_id || sessionId;
+    versionId = data.version_id || versionId;
+    $("resumeText").value = data.resume_text || "";
+    if (versionId && (versionStack.length === 0 || versionStack[versionStack.length - 1] !== versionId)) {
+      versionStack.push(versionId);
+    }
+    appendPromptHistory("改写", instruction);
+    syncVersionButtons();
+    setStatus($("genStatus"), `改写完成 ✓（当前版本：${versionId}）`);
+  } catch (err) {
+    setStatus($("genStatus"), "改写失败: " + err.message, true);
+  } finally {
+    $("rewriteBtn").disabled = false;
+    $("generateBtn").disabled = false;
+    $("genSpinner").style.display = "none";
+  }
+};
+
+/* ── 回到上一版本 ─────────────────────────── */
+$("rollbackBtn").onclick = async () => {
+  if (!sessionId || versionStack.length <= 1) {
+    alert("当前已是首个版本，无法继续回退");
+    return;
+  }
+
+  const targetVersion = versionStack[versionStack.length - 2];
+  $("rollbackBtn").disabled = true;
+  $("rewriteBtn").disabled = true;
+  $("generateBtn").disabled = true;
+  $("genSpinner").style.display = "inline";
+  setStatus($("genStatus"), "正在回到上一版本…");
+
+  try {
+    const r = await fetch(`/api/version?session_id=${encodeURIComponent(sessionId)}&version_id=${encodeURIComponent(targetVersion)}`);
+    const p = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(p.detail || `服务器错误 (${r.status})`);
+
+    versionId = p.version_id || targetVersion;
+    $("resumeText").value = p.resume_text || "";
+    versionStack.pop();
+    appendPromptHistory("回退", `回到 ${versionId}`);
+    syncVersionButtons();
+    setStatus($("genStatus"), `已回到上一版本 ✓（当前版本：${versionId}）`);
+  } catch (err) {
+    setStatus($("genStatus"), "回退失败: " + err.message, true);
+    syncVersionButtons();
+  } finally {
+    $("generateBtn").disabled = false;
+    $("genSpinner").style.display = "none";
+  }
+};
+
+/* ── 获取 DOCX Blob ────────────────────────── */
+async function fetchDocxBlob() {
+  const text = $("resumeText").value.trim();
+  if (!text) throw new Error("简历文本为空");
+  const r = await fetch("/api/preview-docx", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      resume_text: text,
+      template: null,
+      photo_file: photoFilename || null,
+      compact: $("layoutMode").value === "compact",
+    }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "请求失败" }));
+    throw new Error(err.detail);
+  }
+  return await r.blob();
+}
+
+/* ── 获取 HTML 文本 ────────────────────────── */
+async function fetchHtmlText() {
+  const text = $("resumeText").value.trim();
+  if (!text) throw new Error("简历文本为空");
+  const r = await fetch("/api/preview-html", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      resume_text: text,
+      compact: $("layoutMode").value === "compact",
+    }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: "请求失败" }));
+    throw new Error(err.detail);
+  }
+  return await r.text();
+}
+
+/* 缓存最近的 HTML，供 PDF 下载复用 */
+let lastHtml = "";
+
+/* ── 切换预览面板可见性 ───────────────────── */
+function showPanel(mode) {
+  $("docxPreview").style.display = mode === "docx" ? "block" : "none";
+  $("htmlPreview").style.display = mode === "html" ? "block" : "none";
+}
+
+/* ── 预览（自动根据模式切换） ──────────────── */
+$("previewBtn").onclick = async () => {
+  const mode = $("previewMode").value;
+  setStatus($("exportStatus"), "正在生成预览…");
+  $("previewBtn").disabled = true;
+  try {
+    if (mode === "html") {
+      showPanel("html");
+      const html = await fetchHtmlText();
+      lastHtml = html;
+      const container = $("htmlPreview");
+      container.innerHTML = "";
+      const iframe = document.createElement("iframe");
+      iframe.style.width = "210mm";
+      iframe.style.border = "none";
+      iframe.style.background = "#fff";
+      iframe.style.transformOrigin = "top left";
+      iframe.style.display = "block";
+      container.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+      /* 自动撑高并缩放 */
+      function fitIframe() {
+        const docEl = iframe.contentDocument.documentElement;
+        const contentH = Math.max(docEl.scrollHeight, docEl.offsetHeight) + 30;
+        iframe.style.height = contentH + "px";
+        const containerW = container.clientWidth - 20;
+        const iframeW = iframe.offsetWidth;
+        const scale = Math.min(containerW / iframeW, 1);
+        iframe.style.transform = `scale(${scale.toFixed(3)})`;
+        iframe.style.marginRight = -(iframeW * (1 - scale)) + "px";
+        iframe.style.marginBottom = -(contentH * (1 - scale)) + "px";
+      }
+      iframe.onload = fitIframe;
+      requestAnimationFrame(fitIframe);
+    } else {
+      showPanel("docx");
+      const blob = await fetchDocxBlob();
+      const container = $("docxPreview");
+      container.innerHTML = "";
+      const renderLib = window.docx || window.docxPreview;
+      await renderLib.renderAsync(blob, container, null, {
+        className: "docx-preview-body",
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        breakPages: true,
+        trimXmlDeclaration: true,
+      });
+      const page = container.querySelector('section.docx');
+      if (page) {
+        page.style.transform = '';
+        requestAnimationFrame(() => {
+          const pw = page.scrollWidth;
+          const cw = container.clientWidth - 30;
+          if (pw > cw) page.style.transform = `scale(${(cw / pw).toFixed(3)})`;
+        });
+      }
+    }
+    setStatus($("exportStatus"), "预览已更新 ✓");
+  } catch (err) {
+    setStatus($("exportStatus"), "预览失败: " + err.message, true);
+  } finally {
+    $("previewBtn").disabled = false;
+  }
+};
+
+/* 预览模式切换时自动切面板 */
+$("previewMode").addEventListener("change", () => {
+  showPanel($("previewMode").value);
+});
+
+/* ── 从简历文本提取「姓名_学校_岗位」作为文件名 ── */
+function getJobTitle() {
+  const text = $("resumeText").value;
+
+  // 姓名：第一个一级标题 # XXX
+  const nameM = text.match(/^#\s+(.+)/m);
+  const name = nameM ? nameM[1].trim() : "";
+
+  // 学校：在教育背景模块后找第一个含「大学/学院/学校」的行
+  let school = "";
+  const eduSection = text.match(/##[^#\n]*教育背景([\s\S]*?)(?=\n##|$)/);
+  if (eduSection) {
+    const sm = eduSection[1].match(/[\u4e00-\u9fa5]{2,6}(?:大学|学院|学校)/);
+    school = sm ? sm[0] : "";
+  }
+
+  // 岗位：求职意向字段
+  const jobM = text.match(/求职意向[：:]\s*(.+)/);
+  const job = jobM ? jobM[1].trim() : "";
+
+  const parts = [name, school, job].filter(Boolean);
+  const raw = parts.length ? parts.join("_") : "简历";
+  return raw.replace(/[\\/:*?"<>|\s]/g, "_");
+}
+
+/* ── 下载 PDF（通过 Playwright 后端渲染） ──── */
+$("downloadPdfBtn").onclick = async () => {
+  const text = $("resumeText").value.trim();
+  if (!text) return alert("简历文本为空");
+  setStatus($("exportStatus"), "正在生成PDF，请稍候…");
+  $("downloadPdfBtn").disabled = true;
+  try {
+    const r = await fetch("/api/render-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resume_text: text,
+        compact: $("layoutMode").value === "compact",
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: "PDF生成失败" }));
+      throw new Error(err.detail);
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = getJobTitle() + ".pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus($("exportStatus"), "PDF 已下载 ✓");
+  } catch (err) {
+    setStatus($("exportStatus"), "PDF生成失败: " + err.message, true);
+  } finally {
+    $("downloadPdfBtn").disabled = false;
+  }
+};
+
+/* ── 下载 DOCX ─────────────────────────────── */
+$("downloadDocxBtn").onclick = async () => {
+  setStatus($("exportStatus"), "正在生成DOCX…");
+  $("downloadDocxBtn").disabled = true;
+  try {
+    const blob = await fetchDocxBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = getJobTitle() + ".docx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus($("exportStatus"), "DOCX 已下载 ✓");
+  } catch (err) {
+    setStatus($("exportStatus"), "下载失败: " + err.message, true);
+  } finally {
+    $("downloadDocxBtn").disabled = false;
+  }
+};
+
+/* ── 下载 TXT ──────────────────────────────── */
+$("downloadTxtBtn").onclick = () => {
+  const text = $("resumeText").value.trim();
+  if (!text) return alert("简历文本为空");
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = getJobTitle() + ".txt";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+/* ── 自动缩减 ──────────────────────────────── */
+let _lastResumeBeforeCompress = null;
+$("undoCompressBtn").onclick = () => {
+  if (!_lastResumeBeforeCompress) return;
+  $("resumeText").value = _lastResumeBeforeCompress;
+  _lastResumeBeforeCompress = null;
+  $("undoCompressBtn").style.display = "none";
+  setStatus($("genStatus"), "已撤回缩减 ↩");
+};
+$("compressBtn").onclick = async () => {
+  const text = $("resumeText").value.trim();
+  if (!text) return;
+  const reduceLines = parseInt($("compressLines").value, 10) || 3;
+  const reduceChars = reduceLines * 40;
+  _lastResumeBeforeCompress = text;
+  $("undoCompressBtn").style.display = "none";
+  $("compressBtn").disabled = true;
+  $("compressSpinner").style.display = "inline";
+  try {
+    const r = await fetch("/api/compress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resume_text: text, reduce_chars: reduceChars }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: "缩减失败" }));
+      throw new Error(err.detail);
+    }
+    const data = await r.json();
+    $("resumeText").value = data.resume_text;
+    $("undoCompressBtn").style.display = "inline-flex";
+    const newLines = data.resume_text.trim().split("\n").filter(l => l.trim()).length;
+    setStatus($("genStatus"), `缩减完成 ✓（当前有效行数：${newLines}）`);
+  } catch (err) {
+    _lastResumeBeforeCompress = null;
+    setStatus($("genStatus"), "缩减失败: " + err.message, true);
+  } finally {
+    $("compressBtn").disabled = false;
+    $("compressSpinner").style.display = "none";
+  }
+};</script>
+</body>
+</html>
