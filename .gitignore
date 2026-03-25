@@ -34,11 +34,14 @@ Thumbs.db
 
 # Project runtime/generated data (contains private info and local indexes)
 data/index/
-data/raw/
 data/sessions/
 data/uploads/
 data/templates/
 web/uploads/
+
+# Ignore all files in data/raw but keep folder structure via .gitkeep
+data/raw/**/*
+!data/raw/**/.gitkeep
 
 # Build artifacts
 build/
